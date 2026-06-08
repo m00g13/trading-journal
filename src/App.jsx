@@ -610,7 +610,7 @@ export default function TradingJournal() {
                       <td style={{ ...S.td, fontSize:15 }} title={t.sellMoonName}>{t.sellMoonEmoji}</td>
                       <td style={{ ...S.td, ...S.pnlC(t.spy) }}>{t.spy!=null?fmtPct(t.spy):"—"}</td>
                       <td style={{ ...S.td, ...S.pnlC(t.sector) }}>{t.sector!=null?`${fmtPct(t.sector)} ${t.sectorSym}`:"—"}</td>
-                      <td style={S.td}><button style={S.btnR} onClick={() => { if(window.confirm(`Delete ${t.symbol} trade? This cannot be undone.`)) deleteTrade(t.id); }}>✕</button></td>
+                      <td style={S.td}><button style={S.btnR} onClick={() => { if(window.confirm("Delete " + t.symbol + " trade? This cannot be undone.")) deleteTrade(t.id); }}>✕</button></td>
                     </tr>
                   ))}
                 </tbody>
