@@ -497,7 +497,7 @@ export default function TradingJournal() {
 
       {/* tabs */}
       <div style={S.tabs}>
-        {[["dashboard","Dashboard"],["trades","Trade Log"],["notes","Notes"],["charts","Charts"],["market","Market Context"],["moon","Moon & Time"],["analysis","AI Analysis"]].map(([k,l]) => (
+        {[["dashboard","Dashboard"],["trades","Trade Log"],["notes","Notes"],["charts","Charts"],["market","Market Context"],["moon","Moon & Time"],["analysis","AI Analysis"],["import","⬆ Import"]].map(([k,l]) => (
           <button key={k} style={S.tab(tab===k)} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -903,7 +903,173 @@ export default function TradingJournal() {
           )}
         </>}
 
+        {/* ═══ IMPORT ═══ */}
+        {tab===\"import\" && <ImportTab trades={trades} setTrades={setTrades} setIsDemo={setIsDemo} setMsg={setMsg} setMsgOk={setMsgOk} />}
+
       </div>
+    </div>
+  );
+}
+
+// ─── Import Tab Component ────────────────────────────────────────────────────
+function ImportTab({ trades, setTrades, setIsDemo, setMsg, setMsgOk }) {
+  const [raw,      setRaw]      = useState(\"\");
+  const [preview,  setPreview]  = useState([]);
+  const [log,      setLog]      = useState([]);
+  const [imported, setImported] = useState(false);
+
+  function parseJson() {
+    setLog([]); setPreview([]); setImported(false);
+    let parsed;
+    try { parsed = JSON.parse(raw.trim()); }
+    catch { setLog([{msg:\"Invalid JSON — check your paste\", ok:false}]); return; }
+
+    // Group BOT/SLD into round trips per symbol chronologically
+    const bySymbol = {};
+    for (const r of parsed) {
+      if (!bySymbol[r.symbol]) bySymbol[r.symbol] = [];
+      bySymbol[r.symbol].push(r);
+    }
+
+    const results = [];
+    for (const [symbol, fills] of Object.entries(bySymbol)) {
+      fills.sort((a,b) => a.time < b.time ? -1 : 1);
+      let openBuy = null;
+      for (const fill of fills) {
+        if (fill.side === \"BOT\") {
+          if (openBuy) results.push(buildJournalTrade(symbol, openBuy, null));
+          openBuy = fill;
+        } else if (fill.side === \"SLD\") {
+          results.push(buildJournalTrade(symbol, openBuy, fill));
+          openBuy = null;
+        }
+      }
+      if (openBuy) results.push(buildJournalTrade(symbol, openBuy, null));
+    }
+
+    results.sort((a,b) => (b.buyDate+b.buyTime) > (a.buyDate+a.buyTime) ? 1 : -1);
+    setPreview(results);
+    setLog([{msg:`Found ${results.length} trade(s) — ${results.filter(t=>t.sellDate).length} closed, ${results.filter(t=>!t.sellDate).length} open`, ok:true}]);
+  }
+
+  function buildJournalTrade(symbol, buy, sell) {
+    const entryPrice = buy && buy.price > 0 && buy.price < 1e100 ? buy.price : null;
+    const exitPrice  = sell && sell.price > 0 && sell.price < 1e100 ? sell.price : null;
+    const totalComm  = (buy?.commission||0) + (sell?.commission||0);
+    let pnl = null;
+    if (entryPrice != null && exitPrice != null) {
+      pnl = Math.round(((exitPrice - entryPrice) * (buy?.quantity||1) - totalComm) * 100) / 100;
+    }
+    const parseDateTime = t => {
+      if (!t) return { date:\"\", time:\"\" };
+      const d = new Date(t);
+      return {
+        date: d.toISOString().slice(0,10),
+        time: d.toISOString().slice(11,16),
+      };
+    };
+    const entry = parseDateTime(buy?.time);
+    const exit  = parseDateTime(sell?.time);
+    return {
+      id:         Date.now() + Math.random(),
+      symbol,
+      side:       \"LONG\",
+      qty:        buy?.quantity || sell?.quantity || 1,
+      entryPrice,
+      exitPrice,
+      pnl,
+      buyDate:    entry.date,
+      buyTime:    entry.time,
+      sellDate:   exit.date || null,
+      sellTime:   exit.time || null,
+      notes:      buy?.note || \"\",
+      tags:       [\"paper\"],
+      stopPrice:  buy?.stop_price || null,
+      commission: totalComm,
+      source:     \"proxobot-import\",
+    };
+  }
+
+  function doImport(clear) {
+    if (preview.length === 0) { setLog(l => [...l, {msg:\"Run Preview first\", ok:false}]); return; }
+    const existing = clear ? [] : trades.filter(t => t.source !== \"demo\");
+    const existingKeys = new Set(existing.map(t => t.symbol + \"|\" + t.buyDate + \"|\" + t.buyTime));
+    let added = 0, skipped = 0;
+    const next = [...existing];
+    for (const t of preview) {
+      const key = t.symbol + \"|\" + t.buyDate + \"|\" + t.buyTime;
+      if (existingKeys.has(key)) { skipped++; continue; }
+      next.push(t); existingKeys.add(key); added++;
+    }
+    saveTrades(next);
+    setTrades(next);
+    setIsDemo(false);
+    setImported(true);
+    setLog(l => [...l,
+      {msg:`✓ ${added} added, ${skipped} skipped (duplicates)`, ok:true},
+      {msg:`Journal now has ${next.length} trade(s) — switch to Trade Log to view`, ok:true},
+    ]);
+  }
+
+  const S2 = {
+    section: { background:C.surface, border:`1px solid ${C.border}`, borderRadius:6, padding:24, marginBottom:16 },
+    label:   { fontSize:10, letterSpacing:2, textTransform:\"uppercase\", color:C.muted, fontFamily:FONT_MONO, marginBottom:10, display:\"block\" },
+    textarea:{ width:\"100%\", minHeight:180, background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, color:C.text, fontFamily:FONT_MONO, fontSize:11, padding:12, resize:\"vertical\", outline:\"none\", lineHeight:1.6 },
+    btn:     (col) => ({ padding:\"8px 20px\", fontFamily:FONT_MONO, fontSize:10, letterSpacing:2, textTransform:\"uppercase\", border:\"none\", borderRadius:3, cursor:\"pointer\", background:col, color:col===C.red?\"#fff\":\"#000\", marginRight:8, marginTop:10 }),
+    th:      { textAlign:\"left\", color:C.muted, fontSize:10, letterSpacing:1, padding:\"6px 8px\", borderBottom:`1px solid ${C.border}` },
+    td:      { padding:\"7px 8px\", borderBottom:`1px solid ${C.border}`, fontSize:11, fontFamily:FONT_MONO },
+  };
+
+  return (
+    <div style={{ padding:24, maxWidth:900 }}>
+      <div style={{ fontSize:18, fontFamily:FONT_DISPLAY, color:C.gold, marginBottom:4 }}>Import from Proxobot</div>
+      <div style={{ fontSize:11, color:C.muted, marginBottom:24, fontFamily:FONT_MONO }}>Paste trades.json → preview → import to journal</div>
+
+      <div style={S2.section}>
+        <span style={S2.label}>Step 1 — Paste trades.json contents</span>
+        <textarea style={S2.textarea} value={raw} onChange={e=>setRaw(e.target.value)} placeholder=\"Paste the full contents of your trades.json file here...\" />
+        <button style={S2.btn(C.gold)} onClick={parseJson}>Preview</button>
+      </div>
+
+      {log.length > 0 && (
+        <div style={S2.section}>
+          <span style={S2.label}>Log</span>
+          {log.map((l,i) => (
+            <div key={i} style={{ fontFamily:FONT_MONO, fontSize:11, color:l.ok?C.green:C.red, lineHeight:1.8 }}>{l.msg}</div>
+          ))}
+        </div>
+      )}
+
+      {preview.length > 0 && (
+        <div style={S2.section}>
+          <span style={S2.label}>Step 2 — Preview ({preview.length} trades)</span>
+          <div style={{ overflowX:\"auto\" }}>
+            <table style={{ width:\"100%\", borderCollapse:\"collapse\" }}>
+              <thead><tr>
+                {[\"Symbol\",\"Entry Date\",\"Exit Date\",\"Entry $\",\"Exit $\",\"Stop\",\"P&L\",\"Comm\"].map(h => <th key={h} style={S2.th}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {preview.map((t,i) => (
+                  <tr key={i}>
+                    <td style={{...S2.td, color:C.gold}}>{t.symbol}</td>
+                    <td style={{...S2.td, color:C.muted}}>{t.buyDate} {t.buyTime}</td>
+                    <td style={{...S2.td, color:C.muted}}>{t.sellDate ? `${t.sellDate} ${t.sellTime}` : <span style={{color:C.green}}>OPEN</span>}</td>
+                    <td style={S2.td}>{t.entryPrice != null ? `$${t.entryPrice.toFixed(2)}` : \"?\"}</td>
+                    <td style={S2.td}>{t.exitPrice  != null ? `$${t.exitPrice.toFixed(2)}`  : \"—\"}</td>
+                    <td style={{...S2.td, color:C.red}}>{t.stopPrice ? `$${t.stopPrice.toFixed(2)}` : \"—\"}</td>
+                    <td style={{...S2.td, color:t.pnl==null?C.muted:t.pnl>=0?C.green:C.red}}>
+                      {t.pnl==null ? \"—\" : (t.pnl>=0?\"+\":\"\")+t.pnl.toFixed(2)}
+                    </td>
+                    <td style={{...S2.td, color:C.muted}}>${t.commission.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button style={S2.btn(C.gold)}   onClick={() => doImport(false)}>Import (merge)</button>
+          <button style={S2.btn(C.red)}    onClick={() => { if(confirm(\"Clear all existing trades first?\")) doImport(true); }}>Clear &amp; Import</button>
+        </div>
+      )}
     </div>
   );
 }
