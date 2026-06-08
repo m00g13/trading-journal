@@ -10,7 +10,7 @@ const FONT_MONO    = "'IBM Plex Mono', 'Courier New', monospace";
 const C = {
   bg:"#080b10", surface:"#0d1118", border:"#1c2230",
   gold:"#c9a84c", silver:"#8ea0b8", green:"#4caf82", red:"#c94c4c",
-  muted:"#3a4860", text:"#cdd6e8", dim:"#5a6a80",
+  muted:"#7a8fa8", text:"#f0f4ff", dim:"#9aaabb",
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -421,7 +421,7 @@ export default function TradingJournal() {
     logo:   { fontFamily:FONT_DISPLAY, fontSize:24, color:C.gold, letterSpacing:2, fontWeight:600 },
     badge:  ok => ({ fontSize:9, padding:"3px 8px", borderRadius:2, letterSpacing:1, textTransform:"uppercase", background:ok?"#0e2018":"#200e0e", color:ok?C.green:C.red, border:`1px solid ${ok?"#2a5040":"#502a2a"}`, marginLeft:10 }),
     tabs:   { background:"#090d14", borderBottom:`1px solid ${C.border}`, display:"flex", padding:"0 24px", gap:2, overflowX:"auto" },
-    tab:    a => ({ padding:"11px 18px", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", cursor:"pointer", background:"none", border:"none", borderBottom:a?`2px solid ${C.gold}`:"2px solid transparent", color:a?C.gold:C.muted, fontFamily:FONT_MONO, transition:"all 0.12s", whiteSpace:"nowrap" }),
+    tab:    a => ({ padding:"11px 18px", fontSize:10, letterSpacing:1.5, textTransform:"uppercase", cursor:"pointer", background:"none", border:"none", borderBottom:a?`2px solid ${C.gold}`:"2px solid transparent", color:a?C.gold:C.silver, fontFamily:FONT_MONO, transition:"all 0.12s", whiteSpace:"nowrap" }),
     body:   { padding:"24px" },
     grid:   { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:10, marginBottom:20 },
     card:   { background:C.surface, border:`1px solid ${C.border}`, borderRadius:4, padding:"14px 18px" },
@@ -610,7 +610,7 @@ export default function TradingJournal() {
                       <td style={{ ...S.td, fontSize:15 }} title={t.sellMoonName}>{t.sellMoonEmoji}</td>
                       <td style={{ ...S.td, ...S.pnlC(t.spy) }}>{t.spy!=null?fmtPct(t.spy):"—"}</td>
                       <td style={{ ...S.td, ...S.pnlC(t.sector) }}>{t.sector!=null?`${fmtPct(t.sector)} ${t.sectorSym}`:"—"}</td>
-                      <td style={S.td}><button style={S.btnR} onClick={() => deleteTrade(t.id)}>✕</button></td>
+                      <td style={S.td}><button style={S.btnR} onClick={() => { if(window.confirm(`Delete ${t.symbol} trade? This cannot be undone.`)) deleteTrade(t.id); }}>✕</button></td>
                     </tr>
                   ))}
                 </tbody>
