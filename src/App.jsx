@@ -890,9 +890,7 @@ function ImportTab({ trades, setTrades, setIsDemo, setMsg, setMsgOk }) {
     setFetching(true);
     setLog([]);
     try {
-      const r = await fetch(`${PROXOBOT_URL}/raw_trades`, {
-        headers: { "ngrok-skip-browser-warning": "true" }
-      });
+      const r = await fetch(`${PROXOBOT_URL}/raw_trades?ngrok-skip-browser-warning=true`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       setRaw(JSON.stringify(data, null, 2));
