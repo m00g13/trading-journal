@@ -878,10 +878,31 @@ export default function TradingJournal() {
 
 // ─── Import Tab Component ────────────────────────────────────────────────────
 function ImportTab({ trades, setTrades, setIsDemo, setMsg, setMsgOk }) {
-  const [raw,      setRaw]      = useState("");
-  const [preview,  setPreview]  = useState([]);
-  const [log,      setLog]      = useState([]);
-  const [imported, setImported] = useState(false);
+  const [raw,        setRaw]        = useState("");
+  const [preview,    setPreview]    = useState([]);
+  const [log,        setLog]        = useState([]);
+  const [imported,   setImported]   = useState(false);
+  const [fetching,   setFetching]   = useState(false);
+
+  const PROXOBOT_URL = "https://brittle-urchin-trophy.ngrok-free.dev";
+
+  async function fetchFromProxobot() {
+    setFetching(true);
+    setLog([]);
+    try {
+      const r = await fetch(`${PROXOBOT_URL}/raw_trades`, {
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      setRaw(JSON.stringify(data, null, 2));
+      setLog([{msg:`✓ Fetched ${data.length} fills from Proxobot — click Preview to continue`, ok:true}]);
+    } catch (e) {
+      setLog([{msg:`✗ Could not reach Proxobot (${e.message}) — make sure Python + ngrok are running, or paste manually below`, ok:false}]);
+    } finally {
+      setFetching(false);
+    }
+  }
 
   function parseJson() {
     setLog([]); setPreview([]); setImported(false);
@@ -991,8 +1012,14 @@ function ImportTab({ trades, setTrades, setIsDemo, setMsg, setMsgOk }) {
       <div style={{ fontSize:11, color:C.muted, marginBottom:24, fontFamily:FONT_MONO }}>Paste trades.json → preview → import to journal</div>
 
       <div style={S2.section}>
-        <span style={S2.label}>Step 1 — Paste trades.json contents</span>
-        <textarea style={S2.textarea} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Paste the full contents of your trades.json file here..." />
+        <span style={S2.label}>Step 1 — Get trades.json</span>
+        <button style={S2.btn(C.silver)} onClick={fetchFromProxobot} disabled={fetching}>
+          {fetching ? "Fetching…" : "⚡ Fetch from Proxobot"}
+        </button>
+        <span style={{ fontSize:10, color:C.muted, marginLeft:10, fontFamily:FONT_MONO }}>
+          or paste manually below
+        </span>
+        <textarea style={{...S2.textarea, marginTop:10}} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Paste the full contents of your trades.json file here..." />
         <button style={S2.btn(C.gold)} onClick={parseJson}>Preview</button>
       </div>
 
