@@ -304,29 +304,6 @@ export default function TradingJournal() {
     setMsg(`✓ Market data loaded for ${syms.join(", ")}`); setMsgOk(true);
   }, [trades, dateFrom, dateTo]);
 
-  // ── IBKR ──────────────────────────────────────────────────────────────
-  const connectIBKR = async () => {
-    setMsg("Connecting to IBKR…"); setMsgOk(false);
-    try {
-      const authRes = await fetch("https://localhost:5000/v1/api/iserver/auth/status");
-      if (!authRes.ok) throw new Error("Gateway not authenticated");
-      const acctData = await (await fetch("https://localhost:5000/v1/api/iserver/accounts")).json();
-      const accountId = acctData.accounts?.[0];
-      if (!accountId) throw new Error("No account found");
-      const raw = await (await fetch(`https://localhost:5000/v1/api/iserver/account/${accountId}/trades`)).json();
-      const parsed = (raw||[]).map((t,i) => ({
-        id:Date.now()+i, buyDate:t.trade_time?.split(" ")[0]||"—", buyTime:t.trade_time?.split(" ")[1]?.slice(0,5)||"—",
-        sellDate:t.trade_time?.split(" ")[0]||"—", sellTime:"—",
-        symbol:t.symbol||"?", side:t.side==="S"?"SHORT":"LONG",
-        qty:Math.abs(t.size||0), entryPrice:t.price||0, exitPrice:t.price||0, pnl:t.realizedPL||0, notes:""
-      }));
-      setTrades(parsed); setIsDemo(false);
-      setMsg(`✓ Loaded ${parsed.length} trades from account ${accountId}`); setMsgOk(true);
-    } catch(e) {
-      setMsg(`✗ ${e.message} — start IBKR Client Portal Gateway at localhost:5000, or upload a CSV`); setMsgOk(false);
-    }
-  };
-
   // ── CSV upload ────────────────────────────────────────────────────────
   const handleCSV = e => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -478,7 +455,6 @@ export default function TradingJournal() {
           <label style={{ ...S.btnG, display:"inline-block", cursor:"pointer" }}>
             Upload CSV<input type="file" accept=".csv" onChange={handleCSV} style={{ display:"none" }}/>
           </label>
-          <button style={S.btn} onClick={connectIBKR}>Connect IBKR</button>
         </div>
       </div>
 
